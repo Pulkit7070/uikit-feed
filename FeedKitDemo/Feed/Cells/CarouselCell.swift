@@ -3,7 +3,7 @@ import UIKit
 /// A large photo with the author's name on top, used in the top carousel.
 final class CarouselCell: UICollectionViewCell {
 
-    private let imageView = UIImageView()
+    private let imageView = RemoteImageView()
     private let authorLabel = UILabel()
 
     override init(frame: CGRect) {
@@ -50,5 +50,13 @@ final class CarouselCell: UICollectionViewCell {
 
     func configure(with photo: Photo) {
         authorLabel.text = photo.author
+        imageView.setImage(from: photo.resizedURL(width: 800), pointSize: bounds.size)
+    }
+
+    // A cell that scrolls off screen is reused for a different item.
+    // Stop the old download so it cannot finish later and show the old photo.
+    override func prepareForReuse() {
+        super.prepareForReuse()
+        imageView.cancelLoad()
     }
 }

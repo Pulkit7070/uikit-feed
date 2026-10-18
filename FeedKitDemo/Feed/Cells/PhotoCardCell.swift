@@ -3,7 +3,7 @@ import UIKit
 /// A card in the vertical list: the photo, then the author and size below it.
 final class PhotoCardCell: UICollectionViewCell {
 
-    private let imageView = UIImageView()
+    private let imageView = RemoteImageView()
     private let authorLabel = UILabel()
     private let detailLabel = UILabel()
     private var aspectRatioConstraint: NSLayoutConstraint?
@@ -63,5 +63,16 @@ final class PhotoCardCell: UICollectionViewCell {
         // collection view is still estimating the card's height.
         aspectRatioConstraint?.priority = UILayoutPriority(999)
         aspectRatioConstraint?.isActive = true
+
+        let width = bounds.width
+        let pointSize = CGSize(width: width, height: width * photo.aspectRatio)
+        imageView.setImage(from: photo.resizedURL(width: 800), pointSize: pointSize)
+    }
+
+    // A cell that scrolls off screen is reused for a different item.
+    // Stop the old download so it cannot finish later and show the old photo.
+    override func prepareForReuse() {
+        super.prepareForReuse()
+        imageView.cancelLoad()
     }
 }
