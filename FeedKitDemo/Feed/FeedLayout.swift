@@ -7,6 +7,7 @@ enum FeedSection: Hashable {
     case feed
 }
 
+@MainActor
 enum FeedLayout {
 
     static let footerKind = UICollectionView.elementKindSectionFooter
