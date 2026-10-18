@@ -1,3 +1,4 @@
+import AVKit
 import UIKit
 
 final class FeedViewController: UIViewController {
@@ -170,6 +171,24 @@ extension FeedViewController: UICollectionViewDelegate {
         let isNearEnd = indexPath.item >= viewModel.feedIDs.count - 5
         if isFeed && isNearEnd {
             loadNextPage()
+        }
+    }
+
+    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+        guard let id = dataSource.itemIdentifier(for: indexPath), let item = viewModel.item(for: id) else { return }
+
+        switch item {
+        case .photo(let photo):
+            navigationController?.pushViewController(PhotoDetailViewController(photo: photo), animated: true)
+        case .video(let video, _):
+            // The system player gives us full-screen playback with sound and controls for free.
+            let playerController = AVPlayerViewController()
+            playerController.player = AVPlayer(url: video.url)
+            // Full screen makes the feed disappear, which pauses its muted card.
+            playerController.modalPresentationStyle = .fullScreen
+            present(playerController, animated: true) {
+                playerController.player?.play()
+            }
         }
     }
 
