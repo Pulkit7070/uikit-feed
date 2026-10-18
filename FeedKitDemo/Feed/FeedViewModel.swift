@@ -17,6 +17,8 @@ final class FeedViewModel {
     }
 
     static let carouselCount = 8
+    /// A video card is inserted after every this-many photo cards.
+    static let videoEvery = 6
 
     private(set) var carouselIDs: [FeedItem.ID] = []
     private(set) var feedIDs: [FeedItem.ID] = []
@@ -28,6 +30,8 @@ final class FeedViewModel {
     private let pageSize: Int
     private var itemsByID: [FeedItem.ID: FeedItem] = [:]
     private var nextPage = 1
+    private var photosInFeed = 0
+    private var videosInFeed = 0
     /// Goes up by one for every request. A response whose number is no longer
     /// current belongs to a request that a refresh has replaced, so it is dropped.
     private var requestNumber = 0
@@ -85,6 +89,8 @@ final class FeedViewModel {
         carouselIDs = []
         feedIDs = []
         itemsByID = [:]
+        photosInFeed = 0
+        videosInFeed = 0
     }
 
     private func append(_ photos: [Photo]) {
@@ -96,8 +102,18 @@ final class FeedViewModel {
 
             if carouselIDs.count < Self.carouselCount {
                 carouselIDs.append(item.id)
-            } else {
-                feedIDs.append(item.id)
+                continue
+            }
+
+            feedIDs.append(item.id)
+            photosInFeed += 1
+
+            if photosInFeed.isMultiple(of: Self.videoEvery) {
+                let sample = Video.samples[videosInFeed % Video.samples.count]
+                let video = FeedItem.video(sample, slot: videosInFeed)
+                itemsByID[video.id] = video
+                feedIDs.append(video.id)
+                videosInFeed += 1
             }
         }
     }
