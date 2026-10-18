@@ -28,6 +28,9 @@ final class FeedViewModel {
     private let pageSize: Int
     private var itemsByID: [FeedItem.ID: FeedItem] = [:]
     private var nextPage = 1
+    /// Goes up by one for every request. A response whose number is no longer
+    /// current belongs to a request that a refresh has replaced, so it is dropped.
+    private var requestNumber = 0
 
     init(api: PhotoFetching = APIClient(), pageSize: Int = 30) {
         self.api = api
@@ -41,7 +44,13 @@ final class FeedViewModel {
     /// Safe to call as often as you like: it does nothing unless the state is `.idle`.
     func loadNextPage() async {
         guard loadState == .idle else { return }
-        await load(page: nextPage)
+        await load(page: nextPage, replacingExisting: false)
+    }
+
+    /// Loads page 1 again and replaces everything once it arrives.
+    /// Runs even while another page is loading; that older request is ignored.
+    func refresh() async {
+        await load(page: 1, replacingExisting: true)
     }
 
     func retry() async {
@@ -50,19 +59,32 @@ final class FeedViewModel {
         await loadNextPage()
     }
 
-    private func load(page: Int) async {
+    private func load(page: Int, replacingExisting: Bool) async {
+        requestNumber += 1
+        let thisRequest = requestNumber
         loadState = .loading
         onChange?()
 
         do {
             let photos = try await api.fetchPhotos(page: page, limit: pageSize)
+            guard thisRequest == requestNumber else { return }
+            if replacingExisting {
+                removeAllItems()
+            }
             append(photos)
             nextPage = page + 1
             loadState = photos.count < pageSize ? .reachedEnd : .idle
         } catch {
+            guard thisRequest == requestNumber else { return }
             loadState = .failed
         }
         onChange?()
+    }
+
+    private func removeAllItems() {
+        carouselIDs = []
+        feedIDs = []
+        itemsByID = [:]
     }
 
     private func append(_ photos: [Photo]) {

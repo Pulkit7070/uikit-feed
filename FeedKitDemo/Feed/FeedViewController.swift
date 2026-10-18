@@ -38,6 +38,13 @@ final class FeedViewController: UIViewController {
         }
     }
 
+    private func refresh() {
+        Task {
+            await viewModel.refresh()
+            collectionView.refreshControl?.endRefreshing()
+        }
+    }
+
     private func configureCollectionView() {
         // The layout asks the data source which section lives at each index.
         let layout = FeedLayout.make { [weak self] index in
@@ -48,6 +55,10 @@ final class FeedViewController: UIViewController {
         collectionView.backgroundColor = .systemBackground
         collectionView.delegate = self
         view.addSubview(collectionView)
+
+        let refreshControl = UIRefreshControl()
+        refreshControl.addAction(UIAction { [weak self] _ in self?.refresh() }, for: .valueChanged)
+        collectionView.refreshControl = refreshControl
     }
 
     private func configureDataSource() {
