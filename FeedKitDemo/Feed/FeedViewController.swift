@@ -25,11 +25,16 @@ final class FeedViewController: UIViewController {
 
         viewModel.onChange = { [weak self] in
             self?.applySnapshot()
+            self?.updateFooter()
         }
         applySnapshot()
 
+        loadNextPage()
+    }
+
+    private func loadNextPage() {
         Task {
-            await viewModel.loadFirstPage()
+            await viewModel.loadNextPage()
         }
     }
 
@@ -41,6 +46,7 @@ final class FeedViewController: UIViewController {
         collectionView = UICollectionView(frame: view.bounds, collectionViewLayout: layout)
         collectionView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         collectionView.backgroundColor = .systemBackground
+        collectionView.delegate = self
         view.addSubview(collectionView)
     }
 
@@ -70,6 +76,29 @@ final class FeedViewController: UIViewController {
                 preconditionFailure("The view model does not create video items yet")
             }
         }
+
+        let footerRegistration = UICollectionView.SupplementaryRegistration<LoadingFooterView>(
+            elementKind: FeedLayout.footerKind
+        ) { footer, _, _ in
+            footer.show(viewModel.loadState)
+            footer.onRetry = {
+                Task { await viewModel.retry() }
+            }
+        }
+        dataSource.supplementaryViewProvider = { collectionView, _, indexPath in
+            collectionView.dequeueConfiguredReusableSupplementary(using: footerRegistration, for: indexPath)
+        }
+    }
+
+    /// The footer is not part of the snapshot, so a new snapshot does not
+    /// redraw it. Instead we find it on screen, if it is there, and update it.
+    private func updateFooter() {
+        let feedSection = dataSource.snapshot().indexOfSection(.feed) ?? 1
+        let footer = collectionView.supplementaryView(
+            forElementKind: FeedLayout.footerKind,
+            at: IndexPath(item: 0, section: feedSection)
+        ) as? LoadingFooterView
+        footer?.show(viewModel.loadState)
     }
 
     private func applySnapshot() {
@@ -78,5 +107,18 @@ final class FeedViewController: UIViewController {
         snapshot.appendItems(viewModel.carouselIDs, toSection: .carousel)
         snapshot.appendItems(viewModel.feedIDs, toSection: .feed)
         dataSource.apply(snapshot, animatingDifferences: true)
+    }
+}
+
+extension FeedViewController: UICollectionViewDelegate {
+
+    /// Start loading the next page a few cards before the user reaches the end,
+    /// so new cards are usually ready before they are needed.
+    func collectionView(_ collectionView: UICollectionView, willDisplay cell: UICollectionViewCell, forItemAt indexPath: IndexPath) {
+        let isFeed = dataSource.sectionIdentifier(for: indexPath.section) == .feed
+        let isNearEnd = indexPath.item >= viewModel.feedIDs.count - 5
+        if isFeed && isNearEnd {
+            loadNextPage()
+        }
     }
 }

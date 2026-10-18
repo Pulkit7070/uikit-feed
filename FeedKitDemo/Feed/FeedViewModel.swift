@@ -6,16 +6,28 @@ import Foundation
 @MainActor
 final class FeedViewModel {
 
+    enum LoadState: Equatable {
+        /// Nothing is loading and more pages may exist.
+        case idle
+        case loading
+        /// The last request failed. Nothing loads again until `retry()`.
+        case failed
+        /// The server sent back a short page, so there is nothing more to load.
+        case reachedEnd
+    }
+
     static let carouselCount = 8
 
     private(set) var carouselIDs: [FeedItem.ID] = []
     private(set) var feedIDs: [FeedItem.ID] = []
+    private(set) var loadState: LoadState = .idle
 
     var onChange: (() -> Void)?
 
     private let api: PhotoFetching
     private let pageSize: Int
     private var itemsByID: [FeedItem.ID: FeedItem] = [:]
+    private var nextPage = 1
 
     init(api: PhotoFetching = APIClient(), pageSize: Int = 30) {
         self.api = api
@@ -26,12 +38,29 @@ final class FeedViewModel {
         itemsByID[id]
     }
 
-    func loadFirstPage() async {
+    /// Safe to call as often as you like: it does nothing unless the state is `.idle`.
+    func loadNextPage() async {
+        guard loadState == .idle else { return }
+        await load(page: nextPage)
+    }
+
+    func retry() async {
+        guard loadState == .failed else { return }
+        loadState = .idle
+        await loadNextPage()
+    }
+
+    private func load(page: Int) async {
+        loadState = .loading
+        onChange?()
+
         do {
-            let photos = try await api.fetchPhotos(page: 1, limit: pageSize)
+            let photos = try await api.fetchPhotos(page: page, limit: pageSize)
             append(photos)
+            nextPage = page + 1
+            loadState = photos.count < pageSize ? .reachedEnd : .idle
         } catch {
-            print("Failed to load the feed: \(error)")
+            loadState = .failed
         }
         onChange?()
     }
@@ -45,10 +74,9 @@ final class FeedViewModel {
 
             if carouselIDs.count < Self.carouselCount {
                 carouselIDs.append(item.id)
-                continue
+            } else {
+                feedIDs.append(item.id)
             }
-
-            feedIDs.append(item.id)
         }
     }
 }
