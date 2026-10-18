@@ -11,12 +11,8 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     ) {
         guard let windowScene = scene as? UIWindowScene else { return }
 
-        let rootViewController = UIViewController()
-        rootViewController.view.backgroundColor = .systemBackground
-        rootViewController.title = "FeedKit Demo"
-
         let window = UIWindow(windowScene: windowScene)
-        window.rootViewController = UINavigationController(rootViewController: rootViewController)
+        window.rootViewController = UINavigationController(rootViewController: FeedViewController())
         window.makeKeyAndVisible()
         self.window = window
     }
